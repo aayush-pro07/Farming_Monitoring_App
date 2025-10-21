@@ -1,0 +1,28 @@
+# ✅ Primary project languages
+*.dart linguist-detectable=true
+*.js linguist-detectable=true
+
+# ❌ Ignore Flutter’s auto-generated native/platform files
+android/** linguist-detectable=false
+ios/** linguist-detectable=false
+windows/** linguist-detectable=false
+macos/** linguist-detectable=false
+linux/** linguist-detectable=false
+
+# ❌ Ignore native source languages
+*.kt linguist-detectable=false
+*.swift linguist-detectable=false
+*.cpp linguist-detectable=false
+*.c linguist-detectable=false
+*.cmake linguist-detectable=false
+*.h linguist-detectable=false
+
+# ❌ Ignore build, assets, and dependency folders
+build/** linguist-detectable=false
+node_modules/** linguist-detectable=false
+.venv/** linguist-detectable=false
+
+# ✅ Treat only your actual source folders as code
+lib/** linguist-detectable=true
+smart_farm_api/** linguist-detectable=true
+test/** linguist-detectable=true
