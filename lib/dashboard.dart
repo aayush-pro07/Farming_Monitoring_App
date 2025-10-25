@@ -17,21 +17,12 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int selectedIndex = 0;
 
-  // Dynamically return the current page instead of pre-building a list
-  Widget getCurrentPage() {
-    switch (selectedIndex) {
-      case 0:
-        return DashboardTab();
-      case 1:
-        return WeatherTab();
-      case 2:
-        return PumpTab();
-      case 3:
-        return FarmInfoPage();
-      default:
-        return DashboardTab();
-    }
-  }
+  final List<Widget> pages = [
+    const DashboardTab(),
+    const WeatherTab(),
+    const PumpTab(),
+    const FarmInfoPage(),
+  ];
 
   void onTabTapped(int index) {
     setState(() {
@@ -53,7 +44,7 @@ class _MainPageState extends State<MainPage> {
         backgroundColor: Colors.green,
         actions: [IconButton(onPressed: logout, icon: const Icon(Icons.logout))],
       ),
-      body: getCurrentPage(), // dynamically builds current tab
+      body: pages[selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         selectedItemColor: Colors.green,
@@ -82,7 +73,6 @@ class _DashboardTabState extends State<DashboardTab> {
   Map<String, dynamic> sensorData = {};
   String thingspeakChannel = "";
   String thingspeakApiKey = "";
-  String? errorMessage;
 
   final Map<String, Map<String, String>> fieldValueMap = {
     "Rain": {"1": "Detected", "0": "Not Detected"},
@@ -95,13 +85,6 @@ class _DashboardTabState extends State<DashboardTab> {
   };
 
   Future<void> fetchFarmerData() async {
-    print("Fetching farmer data...");
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-      sensorData = {};
-    });
-
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
@@ -115,23 +98,16 @@ class _DashboardTabState extends State<DashboardTab> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final fetchedData = Map<String, dynamic>.from(data['sensorData'] ?? {});
         setState(() {
-          if (fetchedData.isEmpty) {
-            errorMessage = "Unable to fetch ThingSpeak data"; // empty response treated as error
-          } else {
-            sensorData = fetchedData;
-          }
+          sensorData = Map<String, dynamic>.from(data['sensorData'] ?? {});
           isLoading = false;
         });
       } else {
         throw Exception("Failed to load data");
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = "Unable to fetch ThingSpeak data";
-      });
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
@@ -144,47 +120,9 @@ class _DashboardTabState extends State<DashboardTab> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) return Center(child: Lottie.asset("assets/loading.json", width: 120));
+    if (sensorData.isEmpty) return const Center(child: Text("No sensor data available", style: TextStyle(fontSize: 16)));
 
-    if (errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(errorMessage!,
-                style: const TextStyle(fontSize: 16, color: Colors.red),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: fetchFarmerData,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text("Retry"),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final filteredKeys =
-        sensorData.keys.where((k) => sensorData[k] != null && sensorData[k].toString().isNotEmpty).toList();
-
-    if (filteredKeys.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text("Unable to fetch ThingSpeak data or no data available",
-                style: TextStyle(fontSize: 16, color: Colors.red),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: fetchFarmerData,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text("Retry"),
-            ),
-          ],
-        ),
-      );
-    }
+    final filteredKeys = sensorData.keys.where((k) => sensorData[k] != null).toList();
 
     return GridView.builder(
       padding: const EdgeInsets.all(16),
@@ -201,23 +139,16 @@ class _DashboardTabState extends State<DashboardTab> {
         String displayValue = rawValue ?? "Error";
 
         fieldValueMap.forEach((field, mapping) {
-          if (key.toLowerCase().contains(field.toLowerCase())) {
-            displayValue = mapping[rawValue] ?? "Error";
-          }
+          if (key.toLowerCase().contains(field.toLowerCase())) displayValue = mapping[rawValue] ?? "Error";
         });
 
-        final isPositive = displayValue.contains("On") ||
-            displayValue.contains("High") ||
-            displayValue.contains("Detected") ||
-            displayValue.contains("Dry");
+        final isPositive = displayValue.contains("On") || displayValue.contains("High") || displayValue.contains("Detected") || displayValue.contains("Dry");
 
         return Container(
           decoration: BoxDecoration(
             color: Colors.green.shade50,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(color: Colors.grey.withOpacity(0.3), blurRadius: 5, spreadRadius: 2)
-            ],
+            boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.3), blurRadius: 5, spreadRadius: 2)],
           ),
           child: Center(
             child: Padding(
@@ -225,21 +156,14 @@ class _DashboardTabState extends State<DashboardTab> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(key,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(key, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Text(displayValue,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: isPositive ? Colors.green : Colors.red,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600)),
+                      style: TextStyle(color: isPositive ? Colors.green : Colors.red, fontSize: 18, fontWeight: FontWeight.w600)),
                   if (displayValue == "Error") const SizedBox(height: 6),
                   if (displayValue == "Error")
-                    const Text("Value not available",
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                        textAlign: TextAlign.center),
+                    const Text("Value not available", style: TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
                 ],
               ),
             ),

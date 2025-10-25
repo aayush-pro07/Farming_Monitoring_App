@@ -134,39 +134,53 @@ app.get('/farmer/data', authMiddleware, async (req, res) => {
 
     let sensorData = {};
 
-    if (farmer.thingspeakChannel && farmer.thingspeakApiKey) {
-      try {
-        const tsResponse = await axios.get(
-          `https://api.thingspeak.com/channels/${farmer.thingspeakChannel}/feeds.json`,
-          {
-            params: {
-              api_key: farmer.thingspeakApiKey,
-              results: 1, // latest entry
-            }
-          }
-        );
-
-        const feeds = tsResponse.data.feeds[0]; // latest feed
-        const channelFields = tsResponse.data.channel; // field1, field2, etc.
-        
-        // Dynamically map fields
-        sensorData = {};
-        for (let i = 1; i <= 8; i++) { // Thingspeak supports up to 8 fields
-          const fieldKey = `field${i}`;
-          if (feeds[fieldKey] !== undefined && channelFields[`field${i}`]) {
-            sensorData[channelFields[`field${i}`]] = feeds[fieldKey]; // key = field name, value = latest data
-          }
-        }
-
-      } catch (err) {
-        console.error("Thingspeak fetch error:", err.message);
-        sensorData = { error: "Unable to fetch Thingspeak data" };
-      }
+    // ✅ Check that user has Thingspeak details
+    if (!farmer.thingspeakChannel || !farmer.thingspeakApiKey) {
+      return res.status(400).json({
+        error: "Thingspeak credentials missing for this user",
+        farmer
+      });
     }
 
-    res.status(200).json({ farmer, sensorData });
+    try {
+      const tsResponse = await axios.get(
+        `https://api.thingspeak.com/channels/${farmer.thingspeakChannel}/feeds.json`,
+        {
+          params: {
+            api_key: farmer.thingspeakApiKey,
+            results: 1, // latest entry only
+          }
+        }
+      );
+
+      const feeds = tsResponse.data.feeds?.[0];
+      const channelFields = tsResponse.data.channel;
+
+      if (!feeds || !channelFields) {
+        return res.status(404).json({ error: "No Thingspeak data available", farmer });
+      }
+
+      // ✅ Dynamically map all field names and values
+      for (let i = 1; i <= 8; i++) {
+        const fieldKey = `field${i}`;
+        const fieldName = channelFields[fieldKey];
+        if (fieldName && feeds[fieldKey] !== undefined && feeds[fieldKey] !== null) {
+          sensorData[fieldName] = feeds[fieldKey];
+        }
+      }
+
+      res.status(200).json({ farmer, sensorData });
+
+    } catch (err) {
+      console.error("Thingspeak fetch error:", err.message);
+      return res.status(502).json({
+        error: "Unable to fetch Thingspeak data",
+        farmer
+      });
+    }
+
   } catch (err) {
-    console.error(err);
+    console.error("Server error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
